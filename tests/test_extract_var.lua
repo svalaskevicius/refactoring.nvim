@@ -313,4 +313,24 @@ T["powershell"]["works"] = function()
   validate(lines, { 2, 0 }, expected_lines, "f'", " avf'", "foo<cr>")
 end
 
+T["scala"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      child.lua [[
+vim.api.nvim_create_autocmd('Filetype', {
+  pattern = 'scala',
+  command = 'setlocal expandtab shiftwidth=2'
+})
+]]
+    end,
+  },
+}
+
+T["scala"]["works"] = function()
+  local lines = read_file "./tests/files/extract_var_works_before.scala"
+  local expected_lines = read_file "./tests/files/extract_var_works_after.scala"
+  child.cmd "edit tmp.scala"
+  validate(lines, { 3, 4 }, expected_lines, " avi)", "foo<cr>")
+end
+
 return T

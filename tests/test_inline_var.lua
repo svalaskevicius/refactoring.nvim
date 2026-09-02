@@ -33,22 +33,21 @@ local set_cursor = function(row, col)
   child.api.nvim_win_set_cursor(0, { row, col })
 end
 
----@param ms integer
-local sleep = function(ms)
-  vim.uv.sleep(ms)
-  -- Poke child's event loop to make it up to date
-  child.api.nvim_eval "1"
-end
-
 ---@param lines string
 ---@param cursor {[1]: integer, [2]: integer}
 ---@param expected_lines string
 local function validate(lines, cursor, expected_lines)
   set_lines(lines)
   set_cursor(cursor[1], cursor[2])
-  child.lua [[vim.wait(1000, function() return #vim.lsp.get_clients({ bufnr = 0 }) == 1  end)]]
+  -- NOTE: some LSP servers (e.g. metals) take a while to start, so wait for the
+  -- client to attach before triggering the refactor
+  child.lua [[vim.wait(30000, function() return #vim.lsp.get_clients({ bufnr = 0 }) == 1  end)]]
   child.type_keys " ai"
-  sleep(1500)
+  -- NOTE: wait for the buffer to reflect the refactor instead of a fixed sleep,
+  -- as LSP round-trips (e.g. with metals) can take several seconds
+  vim.wait(60000, function()
+    return vim.deep_equal(get_lines(), vim.split(expected_lines, "\n"))
+  end, 100)
   eq(get_lines(), vim.split(expected_lines, "\n"))
 end
 
@@ -151,6 +150,34 @@ T["python"]["comparison operator"] = function()
 
   child.cmd "edit tmp.py"
   validate(lines, { 2, 4 }, expected_lines)
+end
+
+T["scala"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      child.lua [[
+vim.api.nvim_create_autocmd('Filetype', {
+  pattern = 'scala',
+  command = 'setlocal expandtab shiftwidth=2'
+})
+]]
+    end,
+  },
+}
+
+T["scala"]["comparison operator"] = function()
+  local lines = read_file "./tests/files/inline_var_comparison_operator_before.scala"
+  local expected_lines = read_file "./tests/files/inline_var_comparison_operator_after.scala"
+
+  -- NOTE: metals reads the file from disk to answer LSP requests, so the
+  -- buffer must point to a real file (an unsaved `tmp.scala` makes it fail
+  -- with `NoSuchFileException`)
+  child.cmd "edit ./tests/files/inline_var_comparison_operator_before.scala"
+  -- NOTE: put the cursor on the usage, not the declaration: in standalone
+  -- mode (no build tool) metals answers `textDocument/definition` at the
+  -- declaration position with the usage location, which can't be matched
+  -- back to a treesitter variable
+  validate(lines, { 3, 2 }, expected_lines)
 end
 
 return T

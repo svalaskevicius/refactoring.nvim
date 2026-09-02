@@ -57,7 +57,64 @@ vim.lsp.config("pyright", {
     ".git",
   },
 })
-vim.lsp.enable { "lua_ls", "clangd", "pyright" }
+vim.lsp.config("metals", {
+  cmd = {
+    "metals",
+    "-J-Djol.magicFieldOffset=true",
+    "-J-Djol.tryWithSudo=true",
+    "-J-Djdk.attach.allowAttachSelf",
+    "-J--add-opens=java.base/java.nio=ALL-UNNAMED",
+    "-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
+    "-J--add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+    "-J--add-exports=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
+    "-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+    "-J--add-exports=jdk.compiler/com.sun.tools.javac.jvm=ALL-UNNAMED",
+    "-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
+    "-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED",
+    "-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED",
+    "-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED",
+    "-J--add-exports=jdk.compiler/com.sun.tools.javac.resources=ALL-UNNAMED",
+    "-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
+    "-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED",
+    "-J--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+    "-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+    "-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
+    "-J--add-opens=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+    "-J--add-opens=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED",
+    "-J-XX:+DisplayVMOutputToStderr",
+    "-J-Xlog:disable",
+    "-J-Xlog:all=warning,gc=warning:stderr",
+  },
+  filetypes = { "scala", "sc" },
+  root_patterns = {
+    "build.sbt",
+    "build.sc",
+    ".bloop",
+    ".metals",
+    ".scala-build",
+    ".git",
+  },
+  init_options = {
+    compilerOptions = {},
+    debuggingProvider = false,
+    testExplorerProvider = false,
+    disableColorOutput = true,
+    doctorProvider = "json",
+    doctorVisibilityProvider = true,
+    executeClientCommandProvider = true,
+    inputBoxProvider = true,
+    quickPickProvider = true,
+    statusBarProvider = "show-message",
+    bspStatusBarProvider = "on",
+    treeViewProvider = true,
+  },
+  settings = {
+    metals = {
+      superMethodLensesEnabled = true,
+    },
+  },
+})
+vim.lsp.enable { "lua_ls", "clangd", "pyright", "metals" }
 
 vim.g.mapleader = " "
 vim.keymap.set("n", "<leader>ai", function()

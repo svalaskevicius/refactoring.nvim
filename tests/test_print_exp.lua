@@ -76,4 +76,26 @@ T["lua"]["works"] = function()
   validate(lines, { 5, 5 }, expected_lines, " pEiW")
 end
 
+T["scala"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      child.lua [[
+vim.api.nvim_create_autocmd('Filetype', {
+  pattern = 'scala',
+  command = 'setlocal expandtab shiftwidth=2'
+})
+]]
+    end,
+  },
+}
+
+T["scala"]["works"] = function()
+  local lines = read_file "./tests/files/print_exp_works_before.scala"
+  local expected_lines = read_file "./tests/files/print_exp_works_after.scala"
+  child.cmd "edit tmp.scala"
+  -- NOTE: `iW` would only select the `+` (words are whitespace delimited), so
+  -- select the whole expression with the `i(` text object instead
+  validate(lines, { 5, 14 }, expected_lines, " pEi(")
+end
+
 return T

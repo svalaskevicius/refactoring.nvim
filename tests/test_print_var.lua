@@ -203,4 +203,24 @@ T["vimscript"]["works"] = function()
   validate(lines, { 2, 8 }, expected_lines, " pviw")
 end
 
+T["scala"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      child.lua [[
+vim.api.nvim_create_autocmd('Filetype', {
+  pattern = 'scala',
+  command = 'setlocal expandtab shiftwidth=2'
+})
+]]
+    end,
+  },
+}
+
+T["scala"]["works"] = function()
+  local lines = read_file "./tests/files/print_var_works_before.scala"
+  local expected_lines = read_file "./tests/files/print_var_works_after.scala"
+  child.cmd "edit tmp.scala"
+  validate(lines, { 3, 8 }, expected_lines, " pviw")
+end
+
 return T

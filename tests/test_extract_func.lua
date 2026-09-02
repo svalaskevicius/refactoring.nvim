@@ -274,4 +274,25 @@ T["vimscript"]["works"] = function()
   validate(lines, { 16, 8 }, expected_lines, " aeip", "bar<cr>")
 end
 
+T["scala"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      child.lua [[
+vim.api.nvim_create_autocmd('Filetype', {
+  pattern = 'scala',
+  command = 'setlocal expandtab shiftwidth=2'
+})
+]]
+    end,
+  },
+}
+
+T["scala"]["works"] = function()
+  local lines = read_file "./tests/files/extract_func_works_before.scala"
+  local expected_lines = read_file "./tests/files/extract_func_works_after.scala"
+  child.cmd "edit ./tests/files/extract_func_works_before.scala"
+  child.cmd "write" -- Save buffer so LSP can attach
+  validate(lines, { 5, 0 }, expected_lines, " ae2j", "baz<cr>")
+end
+
 return T

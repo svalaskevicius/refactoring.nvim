@@ -600,6 +600,78 @@ local function extract_func(opts)
     )
     :totable()
 
+  -- Detect last expression in selected range and get its type via LSP (Metals for Scala)
+  if #return_values == 0 and lang == "scala" then
+    local function get_last_expr_type()
+      local root = nested_lang_tree:trees()[1]:root()
+      local last_node ---@type TSNode?
+
+      local function find_last_expr(node)
+        local srow, _, erow, _ = node:range()
+        if erow < selected_range.start_row or srow > selected_range.end_row then return nil end
+        if srow == selected_range.end_row and node:start() >= selected_range.end_col then return nil end
+
+        local found ---@type TSNode?
+        for child in node:iter_children() do
+          local c = find_last_expr(child)
+          if c then found = c end
+        end
+        return found or node
+      end
+
+      last_node = find_last_expr(root)
+      if not last_node then return end
+
+      local ntype = last_node:type()
+      if ntype == "val_definition" or ntype == "var_definition" or ntype == "block" then return end
+
+      local text = ts.get_node_text(last_node, in_buf)
+      if not text or vim.trim(text) == "" then return end
+
+      -- Wait for Metals LSP client to be running
+      local metals_ready = vim.wait(30000, function()
+        local clients = vim.lsp.get_clients({ bufnr = in_buf })
+        for _, c in ipairs(clients) do
+          if c.name == "metals" and c.running then return true end
+        end
+        return false
+      end, 500, true)
+
+      if not metals_ready then return end
+
+      -- Use textDocument/declaration to get type info
+      local uri = vim.uri_from_bufnr(in_buf)
+      local response = vim.lsp.buf_request_sync(in_buf, "textDocument/declaration", {
+        textDocument = { uri = uri },
+        position = { line = last_node:start(), character = 0 },
+      }, 15000)
+
+      if response then
+        for _, buf_resp in pairs(response) do
+          if buf_resp.result and #buf_resp.result > 0 then
+            local loc = buf_resp.result[1]
+            local def_buf = vim.uri_to_bufnr(loc.uri)
+            if vim.fn.bufexists(def_buf) > 0 then
+              vim.fn.bufload(def_buf)
+              -- Extract type from definition
+              local def_lines = vim.api.nvim_buf_get_lines(def_buf, 0, -1, true)
+              local def_text = table.concat(def_lines, "\n")
+              for type_match in def_text:gmatch("(%u%w*)") do
+                if not vim.list_contains({ "def", "val", "var", "class", "object", "trait", "package", "import", "type", "return" }, type_match:lower()) then
+                  return { identifier = text, type = type_match }
+                end
+              end
+            end
+          end
+        end
+      end
+      return nil
+    end
+
+    local last_type = get_last_expr_type()
+    if last_type then table.insert(return_values, last_type) end
+  end
+
   local expandtab = vim.bo[out_buf].expandtab
 
   local body = table.concat(lines, "\n")

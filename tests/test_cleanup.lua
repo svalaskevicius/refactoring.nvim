@@ -83,4 +83,24 @@ T["lua"]["does not leave whitespace behind"] = function()
   validate(lines, { 1, 0 }, expected_lines, "VG", " pc")
 end
 
+T["scala"] = MiniTest.new_set {
+  hooks = {
+    pre_case = function()
+      child.lua [[
+vim.api.nvim_create_autocmd('Filetype', {
+  pattern = 'scala',
+  command = 'setlocal expandtab shiftwidth=2'
+})
+]]
+    end,
+  },
+}
+
+T["scala"]["works"] = function()
+  local lines = read_file "./tests/files/cleanup_works_before.scala"
+  local expected_lines = read_file "./tests/files/cleanup_works_after.scala"
+  child.cmd "edit tmp.scala"
+  validate(lines, { 1, 0 }, expected_lines, "VG", " pc")
+end
+
 return T

@@ -73,6 +73,9 @@ local extract_var_code_generation = {
     powershell = function(opts)
       return ("$%s = %s"):format(opts.name, opts.value)
     end,
+    scala = function(opts)
+      return ("val %s = %s"):format(opts.name, opts.value)
+    end,
   },
   variable = {
     php = function(opts)
@@ -375,6 +378,21 @@ function! s:%s(%s) abort
 %s
 endfunction]]):format(opts.name, args, opts.body)
     end,
+    scala = function(opts)
+      local return_type = #opts.return_values == 0 and "Unit" or (opts.return_values[1].type or "P")
+      local args = iter(opts.args)
+        :map(
+          ---@param v refactor.Variable
+          function(v)
+            return ("%s: %s"):format(v.identifier, v.type or "P")
+          end
+        )
+        :join ", "
+      return ([[
+private def %s(%s): %s = {
+%s
+}]]):format(opts.name, args, return_type, opts.body)
+    end,
   },
   function_call = {
     lua = function(opts)
@@ -617,6 +635,18 @@ endfunction]]):format(opts.name, args, opts.body)
         :join ", "
       return ([[%s %s(%s)]]):format(return_values, opts.name, args)
     end,
+    scala = function(opts)
+      local args = iter(opts.args)
+        :map(
+          ---@param v refactor.Variable
+          function(v)
+            return v.identifier
+          end
+        )
+        :join ", "
+      if #opts.return_values == 0 then return ("%s(%s)"):format(opts.name, args) end
+      return ("val %s = %s(%s)"):format(opts.return_values[1].identifier, opts.name, args)
+    end,
   },
   return_statement = {
     lua = function(opts)
@@ -733,6 +763,18 @@ endfunction]]):format(opts.name, args, opts.body)
           :join ", ")
       return ([[return %s]]):format(return_values)
     end,
+    scala = function(opts)
+      if #opts.return_values == 0 then return "\n\n" end
+      local return_values = iter(opts.return_values)
+        :map(
+          ---@param v refactor.Variable
+          function(v)
+            return v.identifier
+          end
+        )
+        :join ", "
+      return ("\n\n%s"):format(return_values)
+    end,
   },
 }
 extract_func_code_generation.function_declaration.cpp = extract_func_code_generation.function_declaration.c
@@ -840,6 +882,14 @@ local print_var_code_generation = {
         opts.identifier
       )
     end,
+    scala = function(opts)
+      return ([[println(s"%s %s %s: ${%s}")]]):format(
+        opts.debug_path,
+        opts.identifier_str,
+        opts.count,
+        opts.identifier
+      )
+    end,
   },
 }
 print_var_code_generation.print_var.typescript = print_var_code_generation.print_var.javascript
@@ -877,6 +927,9 @@ local print_loc_code_generation = {
     end,
     php = function(opts)
       return ([[printf('%s %s ');]]):format(opts.debug_path, opts.count)
+    end,
+    scala = function(opts)
+      return ([[println("%s %s")]]):format(opts.debug_path, opts.count)
     end,
   },
 }
@@ -957,6 +1010,14 @@ local print_exp_code_generation = {
         opts.expression
       )
     end,
+    scala = function(opts)
+      return ([[println(s"%s %s %s: ${%s}")]]):format(
+        opts.debug_path,
+        opts.expression_str,
+        opts.count,
+        opts.expression
+      )
+    end,
   },
 }
 print_exp_code_generation.print_exp.typescript = print_exp_code_generation.print_exp.javascript
@@ -987,6 +1048,9 @@ local inline_var_code_generation = {
       return ("(%s)"):format(opts.expression)
     end,
     c_sharp = function(opts)
+      return ("(%s)"):format(opts.expression)
+    end,
+    scala = function(opts)
       return ("(%s)"):format(opts.expression)
     end,
   },
