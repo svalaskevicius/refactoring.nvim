@@ -39,9 +39,29 @@ end
 local function validate(lines, cursor, expected_lines)
   set_lines(lines)
   set_cursor(cursor[1], cursor[2])
-  -- NOTE: some LSP servers (e.g. metals) take a while to start, so wait for the
-  -- client to attach before triggering the refactor
-  child.lua [[vim.wait(30000, function() return #vim.lsp.get_clients({ bufnr = 0 }) == 1  end)]]
+  -- NOTE: wait until the LSP client is actually ready to answer requests before
+  -- triggering the refactor. Most servers are ready as soon as they attach, but
+  -- metals needs extra time after attaching (JVM + startup), so for metals we
+  -- poll with a definition request until it responds, instead of a fixed delay.
+  child.lua [[
+    vim.wait(60000, function()
+      local clients = vim.lsp.get_clients({ bufnr = 0 })
+      if #clients ~= 1 then return false end
+      local client = clients[1]
+      if client.name ~= "metals" then return true end
+      local cursor = vim.api.nvim_win_get_cursor(0)
+      local resp = vim.lsp.buf_request_sync(0, "textDocument/definition", {
+        textDocument = { uri = vim.uri_from_bufnr(0) },
+        position = { line = cursor[1] - 1, character = cursor[2] },
+      }, 500)
+      if resp then
+        for _, r in pairs(resp) do
+          if r.result and #r.result > 0 then return true end
+        end
+      end
+      return false
+    end, 200)
+  ]]
   child.type_keys " ai"
   -- NOTE: wait for the buffer to reflect the refactor instead of a fixed sleep,
   -- as LSP round-trips (e.g. with metals) can take several seconds

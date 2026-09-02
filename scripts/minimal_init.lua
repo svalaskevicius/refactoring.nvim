@@ -1,4 +1,5 @@
 vim.cmd "set rtp+=."
+vim.env.PATH = vim.fn.getcwd() .. "/deps/bin:" .. vim.env.PATH
 
 vim.cmd "set rtp+=deps/mini.nvim"
 vim.cmd "set rtp+=deps/async.nvim"
@@ -59,7 +60,7 @@ vim.lsp.config("pyright", {
 })
 vim.lsp.config("metals", {
   cmd = {
-    "metals",
+    vim.fn.getcwd() .. "/deps/bin/metals",
     "-J-Djol.magicFieldOffset=true",
     "-J-Djol.tryWithSudo=true",
     "-J-Djdk.attach.allowAttachSelf",
@@ -86,7 +87,7 @@ vim.lsp.config("metals", {
     "-J-Xlog:all=warning,gc=warning:stderr",
   },
   filetypes = { "scala", "sc" },
-  root_patterns = {
+  root_markers = {
     "build.sbt",
     "build.sc",
     ".bloop",

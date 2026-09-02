@@ -292,6 +292,35 @@ T["scala"]["works"] = function()
   local expected_lines = read_file "./tests/files/extract_func_works_after.scala"
   child.cmd "edit ./tests/files/extract_func_works_before.scala"
   child.cmd "write" -- Save buffer so LSP can attach
+  -- Wait in the PARENT so the child's event loop is free to initialize LSP.
+  -- Poll the child (non-blocking from child's perspective) until metals can
+  -- actually respond to a definition request.
+  local metals_up = vim.wait(120000, function()
+    local ok, ready = pcall(function()
+      return child.lua [[
+        return (function()
+          local clients = vim.lsp.get_clients({ bufnr = 0 })
+          for _, c in ipairs(clients) do
+            if c.name == "metals" and c.initialized then
+              local cursor = vim.api.nvim_win_get_cursor(0)
+              local resp = vim.lsp.buf_request_sync(0, "textDocument/definition", {
+                textDocument = { uri = vim.uri_from_bufnr(0) },
+                position = { line = cursor[1] - 1, character = cursor[2] },
+              }, 3000)
+              if resp then
+                for _, r in pairs(resp) do
+                  if r.result then return true end
+                end
+              end
+            end
+          end
+          return false
+        end)()
+      ]]
+    end)
+    return ok and ready == true
+  end, 3000, true)
+  assert(metals_up, "Metals LSP client failed to become ready within 120s")
   validate(lines, { 5, 0 }, expected_lines, " ae2j", "baz<cr>")
 end
 

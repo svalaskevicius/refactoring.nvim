@@ -628,43 +628,20 @@ local function extract_func(opts)
       local text = ts.get_node_text(last_node, in_buf)
       if not text or vim.trim(text) == "" then return end
 
-      -- Wait for Metals LSP client to be running
-      local metals_ready = vim.wait(30000, function()
-        local clients = vim.lsp.get_clients({ bufnr = in_buf })
-        for _, c in ipairs(clients) do
-          if c.name == "metals" and c.running then return true end
-        end
-        return false
-      end, 500, true)
-
-      if not metals_ready then return end
-
-      -- Use textDocument/declaration to get type info
-      local uri = vim.uri_from_bufnr(in_buf)
-      local response = vim.lsp.buf_request_sync(in_buf, "textDocument/declaration", {
-        textDocument = { uri = uri },
-        position = { line = last_node:start(), character = 0 },
-      }, 15000)
-
-      if response then
-        for _, buf_resp in pairs(response) do
-          if buf_resp.result and #buf_resp.result > 0 then
-            local loc = buf_resp.result[1]
-            local def_buf = vim.uri_to_bufnr(loc.uri)
-            if vim.fn.bufexists(def_buf) > 0 then
-              vim.fn.bufload(def_buf)
-              -- Extract type from definition
-              local def_lines = vim.api.nvim_buf_get_lines(def_buf, 0, -1, true)
-              local def_text = table.concat(def_lines, "\n")
-              for type_match in def_text:gmatch("(%u%w*)") do
-                if not vim.list_contains({ "def", "val", "var", "class", "object", "trait", "package", "import", "type", "return" }, type_match:lower()) then
-                  return { identifier = text, type = type_match }
-                end
-              end
-            end
-          end
+      -- Check that Metals LSP client is running
+      local clients = vim.lsp.get_clients({ bufnr = in_buf })
+      local metals_ready = false
+      for _, c in ipairs(clients) do
+        if c.name == "metals" and c.initialized then
+          metals_ready = true
+          break
         end
       end
+      if not metals_ready then
+        error(("[extract_func] Metals LSP client is not initialized for buffer %d (%s, %d client(s))"):format(
+          in_buf, vim.api.nvim_buf_get_name(in_buf), #clients))
+      end
+
       return nil
     end
 
